@@ -1,0 +1,16 @@
+[Unit]
+Description=Backend FastAPI - Dulce Espera
+After=network.target
+
+[Service]
+User=httpreen
+WorkingDirectory=/home/httpreen/Documentos/inventario/backend
+Environment="PATH=/home/httpreen/Documentos/inventario/backend/venv/bin"
+# Run with 4 uvicorn workers for production scaling
+ExecStart=/home/httpreen/Documentos/inventario/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 4
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
