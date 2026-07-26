@@ -21,6 +21,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Enable Gzip compression for fast network transfers
+app.add_middleware(GzipMiddleware, minimum_size=500)
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
