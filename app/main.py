@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.gzip import GzipMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, DBAPIError
@@ -23,7 +23,7 @@ app = FastAPI(
 )
 
 # Enable Gzip compression for fast network transfers
-app.add_middleware(GzipMiddleware, minimum_size=500)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Configure CORS
 app.add_middleware(
