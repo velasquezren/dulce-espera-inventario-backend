@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import List
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GzipMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, DBAPIError
