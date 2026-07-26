@@ -24,6 +24,7 @@ class Pedido(Base):
     fecha_solicitud = Column(DateTime, nullable=True)
     estado = Column(String(30), default="pendiente")
     fecha_estado = Column(DateTime, nullable=True)
+    motivo = Column(String(500), nullable=True)
 
     # Relationships
     lineas = relationship("DetallePedido", back_populates="pedido", cascade="all, delete-orphan")

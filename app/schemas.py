@@ -24,6 +24,7 @@ class DetallePedidoCreate(BaseModel):
 class PedidoCreate(BaseModel):
     solicitante: str = Field(..., min_length=1, max_length=100, description="Identificación del solicitante")
     lineas: List[DetallePedidoCreate] = Field(..., min_length=1, description="Debe contener al menos una línea de pedido")
+    motivo: Optional[str] = Field(None, max_length=500, description="Motivo o comentario de la solicitud")
 
 
 class DetallePedidoOut(BaseModel):
@@ -59,6 +60,7 @@ class PedidoOut(BaseModel):
     fecha_solicitud: Optional[datetime] = None
     estado: str
     fecha_estado: Optional[datetime] = None
+    motivo: Optional[str] = None
     lineas: List[DetallePedidoOut] = []
 
     model_config = ConfigDict(from_attributes=True)
