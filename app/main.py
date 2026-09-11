@@ -83,7 +83,9 @@ def obtener_insumos(db: Session = Depends(get_db)):
     Devuelve la lista de insumos activos cargados en el sistema.
     Retorna una lista vacía si aún no se han exportado insumos desde FileMaker.
     """
-    insumos = db.query(models.Insumo).filter(models.Insumo.activo == 1).all()
+    insumos = db.query(models.Insumo).filter(
+        models.Insumo.activo == 1
+    ).order_by(models.Insumo.nombre.asc()).all()
     return insumos
 
 
@@ -254,6 +256,7 @@ def obtener_pedidos_pendientes_fm(db: Session = Depends(get_db)):
                 "insumo_id_publico": l.insumo_id_publico,
                 "nombre_insumo": l.insumo.nombre if l.insumo else None,
                 "categoria_insumo": l.insumo.categoria if l.insumo else None,
+                "grupo_insumo": l.insumo.grupo if l.insumo else None,
                 "presentacion_insumo": l.insumo.presentacion if l.insumo else None,
                 "cantidad": float(l.cantidad) if l.cantidad else 0.0
             })
@@ -296,6 +299,7 @@ def obtener_detalles_pendientes_flat_fm(db: Session = Depends(get_db)):
                 "insumo_id_publico": l.insumo_id_publico,
                 "nombre_insumo": l.insumo.nombre if l.insumo else None,
                 "categoria_insumo": l.insumo.categoria if l.insumo else None,
+                "grupo_insumo": l.insumo.grupo if l.insumo else None,
                 "presentacion_insumo": l.insumo.presentacion if l.insumo else None,
                 "cantidad": float(l.cantidad) if l.cantidad else 0.0
             })

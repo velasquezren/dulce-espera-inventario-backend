@@ -9,6 +9,7 @@ class InsumoOut(BaseModel):
     id_publico: str
     nombre: Optional[str] = None
     categoria: Optional[str] = None
+    grupo: Optional[str] = None
     presentacion: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -46,6 +47,12 @@ class DetallePedidoOut(BaseModel):
     def categoria_insumo(self) -> Optional[str]:
         """Provides flat access to the insumo category."""
         return self.insumo.categoria if self.insumo else None
+
+    @computed_field
+    @property
+    def grupo_insumo(self) -> Optional[str]:
+        """Provides flat access to the insumo purchase group."""
+        return self.insumo.grupo if self.insumo else None
 
     @computed_field
     @property

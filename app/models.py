@@ -8,6 +8,7 @@ class Insumo(Base):
     id_publico = Column(String(36), primary_key=True, index=True)
     nombre = Column(String(150), nullable=True)
     categoria = Column(String(100), nullable=True)
+    grupo = Column(String(100), nullable=True)
     presentacion = Column(String(100), nullable=True)
     activo = Column(Integer, default=1)  # TINYINT maps to Integer in SQLAlchemy
     fecha_actualizacion = Column(DateTime, nullable=True)
