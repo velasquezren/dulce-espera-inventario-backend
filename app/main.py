@@ -914,11 +914,11 @@ def resolver_canal_compra(linea) -> str:
     return "Super Mercado"
 
 
-def render_tabla_canal(titulo: str, subtitulo: str, icono: str, color_hex: str, lineas: list) -> str:
+def render_tabla_canal(titulo: str, subtitulo: str, color_hex: str, lineas: list) -> str:
     if not lineas:
         return f"""
         <div style="padding: 12px 16px; border-left: 3px solid #cbd5e1; background-color: #f8fafc; color: #64748b; font-size: 12px; font-weight: 500; margin-bottom: 24px; font-style: italic; border-radius: 4px;">
-            {icono} No se registraron requerimientos para el canal de {titulo}.
+            No se registraron requerimientos para el canal de {titulo}.
         </div>
         """
 
@@ -946,7 +946,7 @@ def render_tabla_canal(titulo: str, subtitulo: str, icono: str, color_hex: str, 
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; border-left: 4px solid {color_hex}; padding-left: 10px;">
             <div>
                 <h3 style="font-size: 13px; font-weight: 900; color: #0f172a; margin: 0; text-transform: uppercase; letter-spacing: 0.04em;">
-                    {icono} {titulo}
+                    {titulo}
                 </h3>
                 <span style="font-size: 11px; color: #64748b; font-weight: 500;">{subtitulo}</span>
             </div>
@@ -1016,11 +1016,11 @@ def ver_reporte_pedido_admin(id_publico: str, db: Session = Depends(get_db)):
             lineas_otros.append(item_data)
 
     html_secciones = ""
-    html_secciones += render_tabla_canal("Grupo A: Plaza de Mercado", "Perecederos, Carnes, Frutas y Verduras frescas", "🥬", "#b45309", lineas_mercado)
-    html_secciones += render_tabla_canal("Grupo B: Supermercado y Abarrotes", "Secos, Lácteos industriales, Granos y Limpieza", "🛒", "#006156", lineas_super)
-    html_secciones += render_tabla_canal("Grupo C: Proveedores Directos", "Distribuidoras, Panadería, Kéfir y Especiales", "🚚", "#4338ca", lineas_prov)
+    html_secciones += render_tabla_canal("Grupo A: Plaza de Mercado", "Perecederos, Carnes, Frutas y Verduras frescas", "#b45309", lineas_mercado)
+    html_secciones += render_tabla_canal("Grupo B: Supermercado y Abarrotes", "Secos, Lácteos industriales, Granos y Limpieza", "#006156", lineas_super)
+    html_secciones += render_tabla_canal("Grupo C: Proveedores Directos", "Distribuidoras, Panadería, Kéfir y Especiales", "#4338ca", lineas_prov)
     if lineas_otros:
-        html_secciones += render_tabla_canal("Grupo D: Otros Insumos y Servicios", "Descartables, envases y consumos varios", "📦", "#475569", lineas_otros)
+        html_secciones += render_tabla_canal("Grupo D: Otros Insumos y Servicios", "Descartables, envases y consumos varios", "#475569", lineas_otros)
 
     chips_resumen = f"""
     <div style="display: flex; gap: 14px; margin-bottom: 25px; border-bottom: 2px solid #cbd5e1; padding-bottom: 14px; flex-wrap: wrap;">
@@ -1028,15 +1028,15 @@ def ver_reporte_pedido_admin(id_publico: str, db: Session = Depends(get_db)):
             TOTAL PEDIDO: <span style="font-size: 14px; color: #0f172a; margin-left: 4px;">{len(pedido.lineas)}</span>
         </div>
         <div style="background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 7px 14px; font-size: 11px; font-weight: 700; color: #92400e;">
-            🥬 MERCADO: <span style="font-size: 14px; color: #b45309; margin-left: 4px;">{len(lineas_mercado)}</span>
+            MERCADO: <span style="font-size: 14px; color: #b45309; margin-left: 4px;">{len(lineas_mercado)}</span>
         </div>
         <div style="background: #e6f0ef; border: 1px solid #b2d8d4; border-radius: 8px; padding: 7px 14px; font-size: 11px; font-weight: 700; color: #006156;">
-            🛒 SUPERMERCADO: <span style="font-size: 14px; color: #006156; margin-left: 4px;">{len(lineas_super)}</span>
+            SUPERMERCADO: <span style="font-size: 14px; color: #006156; margin-left: 4px;">{len(lineas_super)}</span>
         </div>
         <div style="background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 7px 14px; font-size: 11px; font-weight: 700; color: #3730a3;">
-            🚚 PROVEEDORES: <span style="font-size: 14px; color: #4338ca; margin-left: 4px;">{len(lineas_prov)}</span>
+            PROVEEDORES: <span style="font-size: 14px; color: #4338ca; margin-left: 4px;">{len(lineas_prov)}</span>
         </div>
-        {f'<div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 14px; font-size: 11px; font-weight: 700; color: #475569;">📦 OTROS: <span style="font-size: 14px; color: #334155; margin-left: 4px;">{len(lineas_otros)}</span></div>' if lineas_otros else ''}
+        {f'<div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 14px; font-size: 11px; font-weight: 700; color: #475569;">OTROS: <span style="font-size: 14px; color: #334155; margin-left: 4px;">{len(lineas_otros)}</span></div>' if lineas_otros else ''}
     </div>
     """
 
@@ -1242,7 +1242,7 @@ def ver_reporte_pedido_abastecimiento(id_publico: str, db: Session = Depends(get
             <td style="padding: 12px 8px; font-weight: 700; color: #0f172a; font-size: 13px;">{nombre}</td>
             <td style="padding: 12px 8px; text-align: right; font-weight: 800; color: #006156; font-size: 14px;">{cantidad_val:.2f}</td>
             <td style="padding: 12px 8px; color: #475569; font-size: 12px;">{presentacion}</td>
-            <td style="padding: 12px 8px; text-align: center; font-size: 18px; color: #cbd5e1;">☐</td>
+            <td style="padding: 12px 8px; text-align: center;"><span style="display: inline-block; width: 14px; height: 14px; border: 1.5px solid #94a3b8; border-radius: 2px;"></span></td>
             <td style="padding: 12px 8px; border-bottom: 1px solid #cbd5e1; width: 120px;"></td>
             <td style="padding: 12px 8px; border-bottom: 1px solid #cbd5e1; width: 100px;"></td>
         </tr>
