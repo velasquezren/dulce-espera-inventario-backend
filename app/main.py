@@ -896,27 +896,89 @@ def ver_reporte_pedido_pdf(id_publico: str, db: Session = Depends(get_db)):
     )
 
 
-def obtener_grupo_insumo(categoria: str) -> str:
-    """
-    Clasifica dinámicamente una categoría de insumos en 'Mercado' (frescos/plaza)
-    o 'Supermercado' (víveres/secos/nutrición clínica).
-    """
-    if not categoria:
-        return "Supermercado"
-    cat = categoria.lower().strip()
-    # Categorías de mercado fresco (plaza de mercado)
-    mercado_keywords = ["verdura", "fruta", "carne", "proteina", "pollo", "pescado", "embutido", "fresco", "huevo"]
-    if any(keyword in cat for keyword in mercado_keywords):
+def resolver_canal_compra(linea) -> str:
+    """Obtiene el canal de compra del insumo: Mercado, Super Mercado, Proveedor u Otros."""
+    if linea.insumo and linea.insumo.grupo:
+        g = linea.insumo.grupo.strip()
+        g_lower = g.lower()
+        if g_lower == "mercado":
+            return "Mercado"
+        elif g_lower in ("super mercado", "super"):
+            return "Super Mercado"
+        elif g_lower == "proveedor":
+            return "Proveedor"
+        return g
+    cat = (linea.insumo.categoria or "").lower() if linea.insumo else ""
+    if any(kw in cat for kw in ["verdura", "fruta", "carne", "proteina", "pollo", "pescado", "fresco", "huevo"]):
         return "Mercado"
-    return "Supermercado"
+    return "Super Mercado"
+
+
+def render_tabla_canal(titulo: str, subtitulo: str, icono: str, color_hex: str, lineas: list) -> str:
+    if not lineas:
+        return f"""
+        <div style="padding: 12px 16px; border-left: 3px solid #cbd5e1; background-color: #f8fafc; color: #64748b; font-size: 12px; font-weight: 500; margin-bottom: 24px; font-style: italic; border-radius: 4px;">
+            {icono} No se registraron requerimientos para el canal de {titulo}.
+        </div>
+        """
+
+    lineas_ordenadas = sorted(lineas, key=lambda x: (x["categoria"] or "", x["nombre"] or ""))
+    total_cant = sum(x["cantidad"] for x in lineas_ordenadas)
+
+    filas = ""
+    for idx, item in enumerate(lineas_ordenadas, 1):
+        filas += f"""
+        <tr style="border-bottom: 1px solid #e2e8f0; page-break-inside: avoid;">
+            <td style="padding: 9px 8px; text-align: center; font-weight: bold; color: #64748b; font-size: 12px;">{idx}</td>
+            <td style="padding: 9px 8px; color: #64748b; font-size: 11px; font-family: monospace;">{item['id_insumo']}</td>
+            <td style="padding: 9px 8px; font-weight: 700; color: #0f172a; text-align: left; font-size: 13px;">{item['nombre']}</td>
+            <td style="padding: 9px 8px; color: #475569; font-size: 12px; text-align: left;"><span style="background: #f1f5f9; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 11px;">{item['categoria']}</span></td>
+            <td style="padding: 9px 8px; text-align: right; font-weight: 800; color: {color_hex}; font-size: 14px;">{item['cantidad']:.2f}</td>
+            <td style="padding: 9px 8px; color: #475569; font-weight: 600; font-size: 12px; text-align: left;">{item['presentacion']}</td>
+            <td style="padding: 9px 8px; text-align: center; vertical-align: middle;">
+                <div style="width: 16px; height: 16px; border: 2px solid #cbd5e1; border-radius: 4px; margin: 0 auto;"></div>
+            </td>
+        </tr>
+        """
+
+    return f"""
+    <div style="margin-bottom: 28px; page-break-inside: avoid;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; border-left: 4px solid {color_hex}; padding-left: 10px;">
+            <div>
+                <h3 style="font-size: 13px; font-weight: 900; color: #0f172a; margin: 0; text-transform: uppercase; letter-spacing: 0.04em;">
+                    {icono} {titulo}
+                </h3>
+                <span style="font-size: 11px; color: #64748b; font-weight: 500;">{subtitulo}</span>
+            </div>
+            <div style="font-size: 11px; color: #64748b; font-weight: 700;">
+                {len(lineas_ordenadas)} insumo{'s' if len(lineas_ordenadas) != 1 else ''} | {total_cant:.2f} unidades
+            </div>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
+            <thead>
+                <tr style="background-color: #f8fafc; border-bottom: 2px solid #cbd5e1;">
+                    <th style="padding: 8px 8px; width: 40px; text-align: center; font-size: 11px; color: #475569; text-transform: uppercase;">N°</th>
+                    <th style="padding: 8px 8px; width: 75px; text-align: left; font-size: 11px; color: #475569; text-transform: uppercase;">Código</th>
+                    <th style="padding: 8px 8px; text-align: left; font-size: 11px; color: #475569; text-transform: uppercase;">Descripción Insumo</th>
+                    <th style="padding: 8px 8px; text-align: left; width: 140px; font-size: 11px; color: #475569; text-transform: uppercase;">Categoría</th>
+                    <th style="padding: 8px 8px; text-align: right; width: 95px; font-size: 11px; color: #475569; text-transform: uppercase;">Cant. Sol.</th>
+                    <th style="padding: 8px 8px; text-align: left; width: 100px; font-size: 11px; color: #475569; text-transform: uppercase;">Presentación</th>
+                    <th style="padding: 8px 8px; width: 75px; text-align: center; font-size: 11px; color: #475569; text-transform: uppercase;">Comprado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {filas}
+            </tbody>
+        </table>
+    </div>
+    """
 
 
 @app.get("/pedidos/{id_publico}/reporte-admin", response_class=HTMLResponse, tags=["Pedidos"])
 def ver_reporte_pedido_admin(id_publico: str, db: Session = Depends(get_db)):
     """
-    Genera un informe administrativo del pedido estructurado y clasificado por
-    grupos de compra: Mercado (Perecederos) y Supermercado (Secos/Abarrotes).
-    Diseñado para el área de compras y administración.
+    Genera un informe administrativo profesional del pedido, estructurado y clasificado
+    por canales de compra reales: Mercado (Plaza/Perecederos), Supermercado y Proveedores Directos.
     """
     pedido = db.query(models.Pedido).options(
         joinedload(models.Pedido.lineas).joinedload(models.DetallePedido.insumo)
@@ -930,131 +992,60 @@ def ver_reporte_pedido_admin(id_publico: str, db: Session = Depends(get_db)):
 
     fecha_str = pedido.fecha_solicitud.strftime("%Y-%m-%d %H:%M") if pedido.fecha_solicitud else "N/A"
     
-    # Clasificación por grupos
     lineas_mercado = []
-    lineas_supermercado = []
-    
-    for idx, linea in enumerate(pedido.lineas, 1):
-        nombre = linea.insumo.nombre if linea.insumo else "Insumo sin nombre"
-        presentacion = linea.insumo.presentacion if linea.insumo else "Unidades"
-        categoria = linea.insumo.categoria if linea.insumo else "Otros"
-        cantidad_val = float(linea.cantidad) if linea.cantidad else 0.0
-        id_insumo = linea.insumo_id_publico or "N/A"
-        
+    lineas_super = []
+    lineas_prov = []
+    lineas_otros = []
+
+    for linea in pedido.lineas:
         item_data = {
-            "nombre": nombre,
-            "presentacion": presentacion,
-            "categoria": categoria,
-            "cantidad": cantidad_val,
-            "id_insumo": id_insumo
+            "nombre": linea.insumo.nombre if linea.insumo else "Insumo sin nombre",
+            "presentacion": linea.insumo.presentacion if linea.insumo else "Unidades",
+            "categoria": linea.insumo.categoria if linea.insumo else "Otros",
+            "cantidad": float(linea.cantidad) if linea.cantidad else 0.0,
+            "id_insumo": linea.insumo_id_publico or "N/A"
         }
-        
-        if obtener_grupo_insumo(categoria) == "Mercado":
+        canal = resolver_canal_compra(linea)
+        if canal == "Mercado":
             lineas_mercado.append(item_data)
+        elif canal == "Super Mercado":
+            lineas_super.append(item_data)
+        elif canal == "Proveedor":
+            lineas_prov.append(item_data)
         else:
-            lineas_supermercado.append(item_data)
+            lineas_otros.append(item_data)
 
-    # Renderizado de tablas
-    html_mercado = ""
-    if lineas_mercado:
-        html_mercado += f"""
-        <div style="margin-bottom: 30px;">
-            <h3 style="font-size: 13px; margin-bottom: 12px; font-weight: 800; color: #475569; border-left: 3px solid #cbd5e1; padding-left: 8px; text-transform: uppercase; letter-spacing: 0.05em;">
-                Grupo A: Plaza de Mercado (Perecederos / Carnes y Verduras)
-            </h3>
-            <table class="details-table">
-                <thead>
-                    <tr>
-                        <th style="width: 45px; text-align: center;">Item</th>
-                        <th style="width: 80px; text-align: left;">Código</th>
-                        <th style="text-align: left;">Descripción Insumo</th>
-                        <th style="text-align: left; width: 150px;">Categoría</th>
-                        <th style="text-align: right; width: 100px;">Cant. Solicitada</th>
-                        <th style="text-align: left; width: 110px;">Unidad</th>
-                        <th style="width: 100px; text-align: center;">Comprado</th>
-                    </tr>
-                </thead>
-                <tbody>
-        """
-        for idx, item in enumerate(lineas_mercado, 1):
-            html_mercado += f"""
-                    <tr style="border-bottom: 1px solid #e2e8f0;">
-                        <td style="padding: 10px; text-align: center; font-weight: bold; color: #64748b; font-size: 13px;">{idx}</td>
-                        <td style="padding: 10px; color: #64748b; font-size: 11px; font-family: monospace;">{item['id_insumo'][:8]}</td>
-                        <td style="padding: 10px; font-weight: 700; color: #0f172a; text-align: left; font-size: 13px;">{item['nombre']}</td>
-                        <td style="padding: 10px; color: #475569; font-size: 12px; text-align: left;">{item['categoria']}</td>
-                        <td style="padding: 10px; text-align: right; font-weight: 800; color: #b45309; font-size: 14px;">{item['cantidad']:.2f}</td>
-                        <td style="padding: 10px; color: #475569; font-weight: 500; font-size: 12px; text-align: left;">{item['presentacion']}</td>
-                        <td style="padding: 10px; text-align: center; vertical-align: middle;">
-                            <div style="width: 16px; height: 16px; border: 2px solid #cbd5e1; border-radius: 4px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: #cbd5e1;"></div>
-                        </td>
-                    </tr>
-            """
-        html_mercado += """
-                </tbody>
-            </table>
-        </div>
-        """
-    else:
-        html_mercado += """
-        <div style="padding: 12px 15px; border-left: 3px solid #cbd5e1; background-color: #f8fafc; color: #64748b; font-size: 12px; font-weight: 500; margin-bottom: 30px; font-style: italic;">
-            No se registraron requerimientos para el grupo de Plaza de Mercado (Perecederos).
-        </div>
-        """
+    html_secciones = ""
+    html_secciones += render_tabla_canal("Grupo A: Plaza de Mercado", "Perecederos, Carnes, Frutas y Verduras frescas", "🥬", "#b45309", lineas_mercado)
+    html_secciones += render_tabla_canal("Grupo B: Supermercado y Abarrotes", "Secos, Lácteos industriales, Granos y Limpieza", "🛒", "#006156", lineas_super)
+    html_secciones += render_tabla_canal("Grupo C: Proveedores Directos", "Distribuidoras, Panadería, Kéfir y Especiales", "🚚", "#4338ca", lineas_prov)
+    if lineas_otros:
+        html_secciones += render_tabla_canal("Grupo D: Otros Insumos y Servicios", "Descartables, envases y consumos varios", "📦", "#475569", lineas_otros)
 
-    html_supermercado = ""
-    if lineas_supermercado:
-        html_supermercado += f"""
-        <div style="margin-bottom: 30px;">
-            <h3 style="font-size: 13px; margin-bottom: 12px; font-weight: 800; color: #475569; border-left: 3px solid #cbd5e1; padding-left: 8px; text-transform: uppercase; letter-spacing: 0.05em;">
-                Grupo B: Supermercado y Abarrotes (Secos / Víveres / Fórmulas)
-            </h3>
-            <table class="details-table">
-                <thead>
-                    <tr>
-                        <th style="width: 45px; text-align: center;">Item</th>
-                        <th style="width: 80px; text-align: left;">Código</th>
-                        <th style="text-align: left;">Descripción Insumo</th>
-                        <th style="text-align: left; width: 150px;">Categoría</th>
-                        <th style="text-align: right; width: 100px;">Cant. Solicitada</th>
-                        <th style="text-align: left; width: 110px;">Unidad</th>
-                        <th style="width: 100px; text-align: center;">Comprado</th>
-                    </tr>
-                </thead>
-                <tbody>
-        """
-        for idx, item in enumerate(lineas_supermercado, 1):
-            html_supermercado += f"""
-                    <tr style="border-bottom: 1px solid #e2e8f0;">
-                        <td style="padding: 10px; text-align: center; font-weight: bold; color: #64748b; font-size: 13px;">{idx}</td>
-                        <td style="padding: 10px; color: #64748b; font-size: 11px; font-family: monospace;">{item['id_insumo'][:8]}</td>
-                        <td style="padding: 10px; font-weight: 700; color: #0f172a; text-align: left; font-size: 13px;">{item['nombre']}</td>
-                        <td style="padding: 10px; color: #475569; font-size: 12px; text-align: left;">{item['categoria']}</td>
-                        <td style="padding: 10px; text-align: right; font-weight: 800; color: #006156; font-size: 14px;">{item['cantidad']:.2f}</td>
-                        <td style="padding: 10px; color: #475569; font-weight: 500; font-size: 12px; text-align: left;">{item['presentacion']}</td>
-                        <td style="padding: 10px; text-align: center; vertical-align: middle;">
-                            <div style="width: 16px; height: 16px; border: 2px solid #cbd5e1; border-radius: 4px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: #cbd5e1;"></div>
-                        </td>
-                    </tr>
-            """
-        html_supermercado += """
-                </tbody>
-            </table>
+    chips_resumen = f"""
+    <div style="display: flex; gap: 14px; margin-bottom: 25px; border-bottom: 2px solid #cbd5e1; padding-bottom: 14px; flex-wrap: wrap;">
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 14px; font-size: 11px; font-weight: 700; color: #475569;">
+            TOTAL PEDIDO: <span style="font-size: 14px; color: #0f172a; margin-left: 4px;">{len(pedido.lineas)}</span>
         </div>
-        """
-    else:
-        html_supermercado += """
-        <div style="padding: 12px 15px; border-left: 3px solid #cbd5e1; background-color: #f8fafc; color: #64748b; font-size: 12px; font-weight: 500; margin-bottom: 30px; font-style: italic;">
-            No se registraron requerimientos para el grupo de Supermercado y Abarrotes.
+        <div style="background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 7px 14px; font-size: 11px; font-weight: 700; color: #92400e;">
+            🥬 MERCADO: <span style="font-size: 14px; color: #b45309; margin-left: 4px;">{len(lineas_mercado)}</span>
         </div>
-        """
+        <div style="background: #e6f0ef; border: 1px solid #b2d8d4; border-radius: 8px; padding: 7px 14px; font-size: 11px; font-weight: 700; color: #006156;">
+            🛒 SUPERMERCADO: <span style="font-size: 14px; color: #006156; margin-left: 4px;">{len(lineas_super)}</span>
+        </div>
+        <div style="background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 7px 14px; font-size: 11px; font-weight: 700; color: #3730a3;">
+            🚚 PROVEEDORES: <span style="font-size: 14px; color: #4338ca; margin-left: 4px;">{len(lineas_prov)}</span>
+        </div>
+        {f'<div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 14px; font-size: 11px; font-weight: 700; color: #475569;">📦 OTROS: <span style="font-size: 14px; color: #334155; margin-left: 4px;">{len(lineas_otros)}</span></div>' if lineas_otros else ''}
+    </div>
+    """
 
     html_content = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Informe de Pedido para Administración - Dulce Espera</title>
+    <title>Informe de Compras por Canal - Dulce Espera</title>
     <style>
         body {{
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -1101,89 +1092,44 @@ def ver_reporte_pedido_admin(id_publico: str, db: Session = Depends(get_db)):
             letter-spacing: 0.05em;
         }}
         .doc-type {{
-            color: #475569;
-            font-size: 12px;
-            font-weight: 700;
             display: inline-block;
-            margin-top: 6px;
+            background-color: #e6f0ef;
+            color: #006156;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 6px;
+            margin-top: 8px;
+            text-transform: uppercase;
             letter-spacing: 0.05em;
         }}
         .meta {{
             text-align: right;
-            font-size: 13px;
+            font-size: 12px;
             color: #475569;
             line-height: 1.6;
         }}
-        .meta strong {{
-            color: #0f172a;
-        }}
-        .stats-row {{
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            margin-bottom: 35px;
-        }}
-        .stat-card {{
-            background-color: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 15px;
-            text-align: center;
-        }}
-        .stat-title {{
-            font-size: 10px;
-            font-weight: 800;
-            color: #64748b;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }}
-        .stat-value {{
-            font-size: 20px;
-            font-weight: 900;
-            margin-top: 5px;
-        }}
-        .details-table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 5px;
-        }}
-        .details-table th {{
-            background-color: #f8fafc;
-            color: #475569;
-            font-weight: 800;
-            text-transform: uppercase;
-            font-size: 11px;
-            letter-spacing: 0.05em;
-            padding: 10px;
-            border-bottom: 2px solid #cbd5e1;
-        }}
         .print-btn {{
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
             background-color: #006156;
-            color: #ffffff;
+            color: white;
             border: none;
+            padding: 10px 18px;
             border-radius: 10px;
-            padding: 12px 24px;
-            font-size: 14px;
-            font-weight: 700;
+            font-weight: bold;
+            font-size: 13px;
             cursor: pointer;
-            transition: all 0.2s ease;
-            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
             gap: 8px;
-            text-decoration: none;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 97, 86, 0.2);
+            margin-bottom: 20px;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 900px;
+            transition: all 0.2s;
         }}
         .print-btn:hover {{
-            background-color: #004d45;
-            transform: translateY(-1px);
-        }}
-        .no-print {{
-            display: flex;
-            justify-content: flex-end;
-            max-width: 900px;
-            margin: 0 auto;
+            background-color: #004d44;
         }}
         .footer {{
             border-top: 1px solid #e2e8f0;
@@ -1226,7 +1172,7 @@ def ver_reporte_pedido_admin(id_publico: str, db: Session = Depends(get_db)):
                 <img src="https://dulce-espera-inventario.vercel.app/logo.svg" alt="Logo" style="width: 75px; height: 75px; object-fit: contain;" onerror="this.style.display='none'">
                 <div>
                     <h1 class="brand-title">DULCE ESPERA</h1>
-                    <span class="doc-type">CONTROL DE COMPRAS E INSUMOS</span>
+                    <span class="doc-type">CONTROL DE COMPRAS POR CANALES</span>
                 </div>
             </div>
             <div class="meta">
@@ -1238,22 +1184,11 @@ def ver_reporte_pedido_admin(id_publico: str, db: Session = Depends(get_db)):
             </div>
         </div>
 
-        <div style="display: flex; gap: 40px; margin-bottom: 30px; border-bottom: 2px solid #cbd5e1; padding-bottom: 12px; flex-wrap: wrap;">
-            <div style="font-size: 12px; color: #475569; font-weight: 600;">
-                TOTAL INSUMOS: <span style="font-size: 15px; font-weight: 800; color: #0f172a; margin-left: 4px;">{len(pedido.lineas)}</span>
-            </div>
-            <div style="font-size: 12px; color: #475569; font-weight: 600;">
-                PLAZA / MERCADO: <span style="font-size: 15px; font-weight: 800; color: #b45309; margin-left: 4px;">{len(lineas_mercado)}</span>
-            </div>
-            <div style="font-size: 12px; color: #475569; font-weight: 600;">
-                SUPERMERCADO: <span style="font-size: 15px; font-weight: 800; color: #006156; margin-left: 4px;">{len(lineas_supermercado)}</span>
-            </div>
-        </div>
+        {chips_resumen}
 
-        {html_mercado}
-        {html_supermercado}
+        {html_secciones}
 
-        <div style="margin-top: 70px; display: flex; justify-content: space-between; gap: 30px;">
+        <div style="margin-top: 60px; display: flex; justify-content: space-between; gap: 30px; page-break-inside: avoid;">
             <div style="text-align: center; flex: 1; border-top: 1px solid #cbd5e1; padding-top: 8px; font-size: 11px; color: #475569; font-weight: 600;">
                 Firma Solicitante Cocina
             </div>
