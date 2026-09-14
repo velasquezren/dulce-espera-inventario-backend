@@ -1,4 +1,5 @@
 import hashlib
+import html
 import time
 import uuid
 from datetime import datetime
@@ -58,6 +59,21 @@ def db_api_error_handler(request, exc: DBAPIError):
             "detail": "Error en la base de datos. Por favor, intente de nuevo más tarde."
         }
     )
+
+# --- UTILIDADES ---
+
+def esc(valor) -> str:
+    """
+    Escapa texto antes de interpolarlo en las plantillas HTML de los reportes.
+
+    Los reportes se construyen con f-strings, así que cualquier texto que no
+    venga de este archivo puede cerrar una etiqueta e inyectar marcado. El
+    campo 'solicitante' lo escribe quien crea el pedido y los nombres del
+    catálogo llegan desde FileMaker, de modo que ninguno de los dos es de
+    confianza. Devuelve cadena vacía para None para no imprimir "None".
+    """
+    return html.escape(str(valor)) if valor is not None else ""
+
 
 # --- ENDPOINTS ---
 
@@ -484,9 +500,9 @@ def ver_reporte_pedido(id_publico: str, db: Session = Depends(get_db)):
     # Generar filas de la tabla
     lineas_html = ""
     for idx, linea in enumerate(pedido.lineas, 1):
-        nombre = linea.insumo.nombre if linea.insumo else "Insumo sin nombre"
-        presentacion = linea.insumo.presentacion if linea.insumo else "Unidades"
-        categoria = linea.insumo.categoria if linea.insumo else "Otros"
+        nombre = esc(linea.insumo.nombre) if linea.insumo else "Insumo sin nombre"
+        presentacion = esc(linea.insumo.presentacion) if linea.insumo else "Unidades"
+        categoria = esc(linea.insumo.categoria) if linea.insumo else "Otros"
         cantidad_val = float(linea.cantidad) if linea.cantidad else 0.0
         
         lineas_html += f"""
@@ -647,8 +663,8 @@ def ver_reporte_pedido(id_publico: str, db: Session = Depends(get_db)):
                 <div><strong>ID Solicitud:</strong> {pedido.id_publico[:8].upper()}</div>
                 <div style="font-size: 10px; color: #94a3b8; margin-bottom: 4px;">UUID: {pedido.id_publico}</div>
                 <div><strong>Fecha:</strong> {fecha_str}</div>
-                <div><strong>Solicitante:</strong> {pedido.solicitante}</div>
-                <div><strong>Estado:</strong> <span style="text-transform: uppercase; font-weight: 800; color: #b45309;">{pedido.estado}</span></div>
+                <div><strong>Solicitante:</strong> {esc(pedido.solicitante)}</div>
+                <div><strong>Estado:</strong> <span style="text-transform: uppercase; font-weight: 800; color: #b45309;">{esc(pedido.estado)}</span></div>
             </div>
         </div>
 
@@ -736,9 +752,9 @@ def ver_reporte_pedido_pdf(id_publico: str, db: Session = Depends(get_db)):
 
     for linea in pedido.lineas:
         item_data = {
-            "nombre": linea.insumo.nombre if linea.insumo else "Insumo sin nombre",
-            "presentacion": linea.insumo.presentacion if linea.insumo else "Unidades",
-            "categoria": linea.insumo.categoria if linea.insumo else "Otros",
+            "nombre": esc(linea.insumo.nombre) if linea.insumo else "Insumo sin nombre",
+            "presentacion": esc(linea.insumo.presentacion) if linea.insumo else "Unidades",
+            "categoria": esc(linea.insumo.categoria) if linea.insumo else "Otros",
             "cantidad": float(linea.cantidad) if linea.cantidad else 0.0,
             "id_insumo": linea.insumo_id_publico or "N/A"
         }
@@ -910,7 +926,7 @@ def ver_reporte_pedido_pdf(id_publico: str, db: Session = Depends(get_db)):
     <table class="info-table">
         <tr>
             <td style="font-size: 10px; color: #475569; line-height: 1.4;">
-                <strong>Solicitado por:</strong> {pedido.solicitante}
+                <strong>Solicitado por:</strong> {esc(pedido.solicitante)}
             </td>
             <td style="font-size: 10px; color: #475569; text-align: right; line-height: 1.4; vertical-align: top;">
                 &nbsp;
@@ -1041,9 +1057,9 @@ def ver_reporte_pedido_admin(id_publico: str, db: Session = Depends(get_db)):
 
     for linea in pedido.lineas:
         item_data = {
-            "nombre": linea.insumo.nombre if linea.insumo else "Insumo sin nombre",
-            "presentacion": linea.insumo.presentacion if linea.insumo else "Unidades",
-            "categoria": linea.insumo.categoria if linea.insumo else "Otros",
+            "nombre": esc(linea.insumo.nombre) if linea.insumo else "Insumo sin nombre",
+            "presentacion": esc(linea.insumo.presentacion) if linea.insumo else "Unidades",
+            "categoria": esc(linea.insumo.categoria) if linea.insumo else "Otros",
             "cantidad": float(linea.cantidad) if linea.cantidad else 0.0,
             "id_insumo": linea.insumo_id_publico or "N/A"
         }
@@ -1221,8 +1237,8 @@ def ver_reporte_pedido_admin(id_publico: str, db: Session = Depends(get_db)):
                 <div><strong>ID Pedido:</strong> {pedido.id_publico[:8].upper()}</div>
                 <div style="font-size: 10px; color: #94a3b8; margin-bottom: 2px;">UUID: {pedido.id_publico}</div>
                 <div><strong>Fecha Pedido:</strong> {fecha_str}</div>
-                <div><strong>Solicitante:</strong> {pedido.solicitante}</div>
-                <div><strong>Estado Actual:</strong> <span style="text-transform: uppercase; font-weight: 800; color: #006156;">{pedido.estado}</span></div>
+                <div><strong>Solicitante:</strong> {esc(pedido.solicitante)}</div>
+                <div><strong>Estado Actual:</strong> <span style="text-transform: uppercase; font-weight: 800; color: #006156;">{esc(pedido.estado)}</span></div>
             </div>
         </div>
 
@@ -1748,9 +1764,9 @@ def ver_reporte_pedido_abastecimiento(id_publico: str, db: Session = Depends(get
 
     rows_html = ""
     for idx, linea in enumerate(pedido.lineas, 1):
-        nombre = linea.insumo.nombre if linea.insumo else "Insumo sin nombre"
-        presentacion = linea.insumo.presentacion if linea.insumo else "Unidades"
-        categoria = linea.insumo.categoria if linea.insumo else "Otros"
+        nombre = esc(linea.insumo.nombre) if linea.insumo else "Insumo sin nombre"
+        presentacion = esc(linea.insumo.presentacion) if linea.insumo else "Unidades"
+        categoria = esc(linea.insumo.categoria) if linea.insumo else "Otros"
         cantidad_val = float(linea.cantidad) if linea.cantidad else 0.0
         id_insumo = linea.insumo_id_publico or "N/A"
 
@@ -1918,8 +1934,8 @@ def ver_reporte_pedido_abastecimiento(id_publico: str, db: Session = Depends(get
                 <div><strong>ID Pedido:</strong> {pedido.id_publico[:8].upper()}</div>
                 <div style="font-size: 10px; color: #94a3b8; margin-bottom: 2px;">UUID: {pedido.id_publico}</div>
                 <div><strong>Fecha Pedido:</strong> {fecha_str}</div>
-                <div><strong>Solicitante:</strong> {pedido.solicitante}</div>
-                <div><strong>Estado Actual:</strong> <span style="text-transform: uppercase; font-weight: 800; color: #006156;">{pedido.estado}</span></div>
+                <div><strong>Solicitante:</strong> {esc(pedido.solicitante)}</div>
+                <div><strong>Estado Actual:</strong> <span style="text-transform: uppercase; font-weight: 800; color: #006156;">{esc(pedido.estado)}</span></div>
             </div>
         </div>
 
@@ -1984,9 +2000,9 @@ def ver_reporte_pedido_categorias(id_publico: str, db: Session = Depends(get_db)
     # Group lines by category
     grouped_items = {}
     for linea in pedido.lineas:
-        nombre = linea.insumo.nombre if linea.insumo else "Insumo sin nombre"
-        presentacion = linea.insumo.presentacion if linea.insumo else "Unidades"
-        categoria = linea.insumo.categoria if (linea.insumo and linea.insumo.categoria) else "Sin Categoría"
+        nombre = esc(linea.insumo.nombre) if linea.insumo else "Insumo sin nombre"
+        presentacion = esc(linea.insumo.presentacion) if linea.insumo else "Unidades"
+        categoria = esc(linea.insumo.categoria) if (linea.insumo and linea.insumo.categoria) else "Sin Categoría"
         cantidad_val = float(linea.cantidad) if linea.cantidad else 0.0
         id_insumo = linea.insumo_id_publico or "N/A"
 
@@ -2190,8 +2206,8 @@ def ver_reporte_pedido_categorias(id_publico: str, db: Session = Depends(get_db)
                 <div><strong>ID Pedido:</strong> {pedido.id_publico[:8].upper()}</div>
                 <div style="font-size: 10px; color: #94a3b8; margin-bottom: 2px;">UUID: {pedido.id_publico}</div>
                 <div><strong>Fecha Pedido:</strong> {fecha_str}</div>
-                <div><strong>Solicitante:</strong> {pedido.solicitante}</div>
-                <div><strong>Estado Actual:</strong> <span style="text-transform: uppercase; font-weight: 800; color: #006156;">{pedido.estado}</span></div>
+                <div><strong>Solicitante:</strong> {esc(pedido.solicitante)}</div>
+                <div><strong>Estado Actual:</strong> <span style="text-transform: uppercase; font-weight: 800; color: #006156;">{esc(pedido.estado)}</span></div>
             </div>
         </div>
 
