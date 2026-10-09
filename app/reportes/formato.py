@@ -1,5 +1,7 @@
 """Formato de numeros y fechas para documentos impresos en espanol."""
 
+import re
+import unicodedata
 from datetime import datetime
 from typing import Optional
 
@@ -40,3 +42,27 @@ def folio(id_publico: Optional[str]) -> str:
 
 def sello(valor: Optional[datetime] = None) -> str:
     return (valor or datetime.now()).strftime("%Y%m%d_%H%M")
+
+
+def _sin_acentos(texto: str) -> str:
+    plano = unicodedata.normalize("NFD", (texto or "").lower())
+    plano = "".join(c for c in plano if unicodedata.category(c) != "Mn")
+    return re.sub(r"[^a-z0-9]+", " ", plano).strip()
+
+
+def presentacion(nombre: Optional[str], unidad: Optional[str]) -> str:
+    """
+    Unidad legible para imprimir.
+
+    En el catalogo hay 447 insumos cuya unidad es una copia del nombre, y asi el
+    renglon queda como "2 aceite fino de 4,800ml" en vez de "2 Unidad". Cuando
+    la unidad no aporta informacion se reemplaza por Unidad, y en el resto se
+    corrige solo el uso de mayusculas (kilos, KILOS y Kilos eran tres unidades
+    distintas en la misma hoja).
+    """
+    texto = (unidad or "").strip()
+    if not texto or _sin_acentos(texto) == _sin_acentos(nombre):
+        return "Unidad"
+    if texto.isupper():
+        return texto.capitalize()
+    return texto[0].upper() + texto[1:]

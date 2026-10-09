@@ -93,11 +93,12 @@ def _secciones(articulos_por_canal: Dict[str, List[Articulo]]) -> List[Seccion]:
 
 def _articulo_de_linea(linea) -> Articulo:
     insumo = getattr(linea, "insumo", None)
+    nombre = (getattr(insumo, "nombre", None) or "Insumo sin nombre").strip()
     return Articulo(
         insumo_id=linea.insumo_id_publico or "-",
-        nombre=(getattr(insumo, "nombre", None) or "Insumo sin nombre").strip(),
+        nombre=nombre,
         categoria=(getattr(insumo, "categoria", None) or "Sin categoria").strip(),
-        presentacion=(getattr(insumo, "presentacion", None) or "Unidades").strip(),
+        presentacion=formato.presentacion(nombre, getattr(insumo, "presentacion", None)),
         cantidad=float(linea.cantidad or 0),
     )
 
