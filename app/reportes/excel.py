@@ -5,10 +5,17 @@ Se trasladaron tal cual desde main.py: son planillas que la gobernanta ya usa y
 cambiarlas aqui no aporta nada. Lo que cambia es donde viven.
 """
 
-from app import models
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+# El canal lo resuelve el mismo criterio que usa el PDF.
+from app.reportes.canales import de_linea as resolver_canal_compra
+
+if TYPE_CHECKING:  # solo para los tipos: generar un documento no toca la base
+    from app import models
 
 
-def generar_excel_pedido(pedido: models.Pedido):
+def generar_excel_pedido(pedido: "models.Pedido"):
     import io
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
