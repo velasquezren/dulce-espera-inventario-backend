@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
 from app.database import get_db, engine
-from app import models, schemas
+from app import estados, models, schemas
 from app.routers import reportes
 
 # Initialize the FastAPI app
@@ -325,48 +325,63 @@ def obtener_detalles_pendientes_flat_fm(db: Session = Depends(get_db)):
 
 
 
-@app.patch("/api/pedidos/actualizar-estado", tags=["FileMaker"])
-def actualizar_estado_pedido_fm(body: schemas.ActualizarEstadoRequest, db: Session = Depends(get_db)):
+def _cambiar_estado(id_publico: str, nuevo_estado: str, db: Session) -> dict:
     """
-    Actualiza el estado de un pedido en MySQL desde FileMaker.
-    Recibe un JSON con id_publico y el nuevo estado.
-    """
-    pedido = db.query(models.Pedido).filter(
-        models.Pedido.id_publico == body.id_publico
-    ).first()
+    Aplica un cambio de estado respetando el flujo del pedido.
 
+    Lo usan los dos endpoints de PATCH (el de FileMaker y el de la aplicacion)
+    para que las reglas no dependan de por donde entre la peticion.
+    """
+    pedido = db.query(models.Pedido).filter(models.Pedido.id_publico == id_publico).first()
     if not pedido:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Pedido con ID '{body.id_publico}' no encontrado."
+            detail=f"Pedido con ID '{id_publico}' no encontrado.",
         )
 
-    estados_validos = ["pendiente", "aceptado", "rechazado", "en revision", "comprado", "entregado", "cancelado"]
-    estado_normalizado = body.estado.lower().strip()
-
-    if estado_normalizado not in estados_validos:
+    destino = estados.normalizar(nuevo_estado)
+    if destino is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Estado '{body.estado}' no válido. Opciones: {', '.join(estados_validos)}"
+            detail=f"Estado '{nuevo_estado}' no valido. Opciones: {', '.join(estados.ESTADOS)}",
         )
 
-    estado_anterior = pedido.estado
-    pedido.estado = estado_normalizado
-    pedido.fecha_estado = datetime.now()
+    problema = estados.motivo_de_rechazo(pedido.estado, destino)
+    if problema:
+        # 409: la peticion esta bien escrita, pero choca con el estado actual.
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=problema)
 
-    try:
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise e
+    estado_anterior = pedido.estado
+
+    # Repetir el mismo estado no es un error ni vuelve a mover la fecha:
+    # evita que un doble clic en FileMaker muestre una alerta sin motivo.
+    if estados.normalizar(estado_anterior) != destino:
+        pedido.estado = destino
+        pedido.fecha_estado = datetime.now()
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
 
     return {
         "status": "success",
         "id_publico": pedido.id_publico,
         "estado_anterior": estado_anterior,
         "estado_nuevo": pedido.estado,
-        "fecha_estado": pedido.fecha_estado.strftime("%Y-%m-%d %H:%M:%S")
+        "fecha_estado": pedido.fecha_estado.strftime("%Y-%m-%d %H:%M:%S") if pedido.fecha_estado else None,
     }
+
+
+@app.patch("/api/pedidos/actualizar-estado", tags=["FileMaker"])
+def actualizar_estado_pedido_fm(body: schemas.ActualizarEstadoRequest, db: Session = Depends(get_db)):
+    """
+    Cambia el estado de un pedido desde FileMaker.
+
+    Si el cambio no corresponde al flujo del pedido responde 409 con una
+    explicacion en texto, que es lo que FileMaker muestra en su dialogo.
+    """
+    return _cambiar_estado(body.id_publico, body.estado, db)
 
 
 @app.get("/api/pedidos-pendientes", tags=["FileMaker"])
@@ -412,56 +427,10 @@ def pedidos_pendientes(estado: str = "pendiente", db: Session = Depends(get_db))
     return {"pedidos": resultado, "total": len(resultado)}
 
 
-@app.patch("/pedidos/actualizar-estado", tags=["FileMaker"])
+@app.patch("/pedidos/actualizar-estado", tags=["Pedidos"])
 def actualizar_estado_pedido(body: schemas.ActualizarEstadoRequest, db: Session = Depends(get_db)):
-    """
-    Actualiza el estado de un pedido existente.
-    Diseñado para que FileMaker envíe un PATCH cuando el administrador
-    aprueba o rechaza un pedido.
-
-    Uso desde FileMaker:
-      Establecer variable [ $json ; JSONSetElement("{}"; ["id_publico"; $id; JSONString]; ["estado"; "aceptado"; JSONString]) ]
-      Establecer variable [ $curl ; "-X PATCH -H \"Content-Type: application/json\" -d " & Quote($json) ]
-      Insertar desde URL [ $respuesta ; "https://tu-api/pedidos/actualizar-estado" ; $curl ]
-
-    Estados válidos: pendiente, aceptado, rechazado, en revision, comprado, entregado, cancelado
-    """
-    pedido = db.query(models.Pedido).filter(
-        models.Pedido.id_publico == body.id_publico
-    ).first()
-
-    if not pedido:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Pedido con ID '{body.id_publico}' no encontrado."
-        )
-
-    estados_validos = ["pendiente", "aceptado", "rechazado", "en revision", "comprado", "entregado", "cancelado"]
-    estado_normalizado = body.estado.lower().strip()
-
-    if estado_normalizado not in estados_validos:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Estado '{body.estado}' no válido. Opciones: {', '.join(estados_validos)}"
-        )
-
-    estado_anterior = pedido.estado
-    pedido.estado = estado_normalizado
-    pedido.fecha_estado = datetime.now()
-
-    try:
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise e
-
-    return {
-        "status": "success",
-        "id_publico": pedido.id_publico,
-        "estado_anterior": estado_anterior,
-        "estado_nuevo": pedido.estado,
-        "fecha_estado": pedido.fecha_estado.isoformat()
-    }
+    """Cambia el estado de un pedido. Misma regla que la ruta de FileMaker."""
+    return _cambiar_estado(body.id_publico, body.estado, db)
 
 
 @app.get("/pedidos/todos", response_model=List[schemas.PedidoOut], tags=["Pedidos"])
