@@ -21,7 +21,12 @@ RAIZ = "/opt/dulce_espera_backend"
 load_dotenv(f"{RAIZ}/.env")
 
 APLICAR = "--aplicar" in sys.argv
-CAMPOS = {"nombre": "nombre", "grupo": "grupo", "presentacion": "presentacion"}
+CAMPOS = {
+    "nombre": "nombre",
+    "grupo": "grupo",
+    "presentacion": "presentacion",
+    "categoria": "categoria",
+}
 
 conexion = pymysql.connect(
     host=os.getenv("DB_HOST", "127.0.0.1"),
