@@ -43,7 +43,7 @@ app.add_middleware(
 def db_operational_error_handler(request, exc: OperationalError):
     import logging
     logger = logging.getLogger("uvicorn")
-    logger.exception("OperationalError in DB:")
+    logger.error("OperationalError in DB: %s", exc, exc_info=exc)
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content={
