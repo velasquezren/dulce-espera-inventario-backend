@@ -183,6 +183,79 @@ def crear_pedido(pedido_in: schemas.PedidoCreate, db: Session = Depends(get_db))
     return pedido_creado
 
 
+@app.put("/pedidos/{id_publico}/lineas", response_model=schemas.PedidoOut, tags=["Pedidos"])
+def editar_lineas_pedido(id_publico: str, cambios: schemas.PedidoEditar, db: Session = Depends(get_db)):
+    """
+    Reemplaza las lineas de un pedido que todavia nadie aprobo.
+
+    Sirve para corregir lo que cocina mando por error: una cantidad equivocada,
+    algo que sobra o algo que falto. Solo mientras el pedido siga pendiente o en
+    revision; despues de Aceptado la lista ya fue autorizada y no se toca.
+    """
+    pedido = db.query(models.Pedido).filter(models.Pedido.id_publico == id_publico).first()
+    if not pedido:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pedido con ID '{id_publico}' no encontrado.",
+        )
+
+    if not estados.se_puede_editar(pedido.estado):
+        etiqueta = estados.ETIQUETAS.get(estados.normalizar(pedido.estado) or "", pedido.estado)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"El pedido ya esta {etiqueta.lower()} y no se puede modificar. "
+                "Solo se corrigen los pedidos pendientes o en revision."
+            ),
+        )
+
+    # Mismo control que al crear: no se aceptan insumos de baja ni inexistentes.
+    pedidos_ids = {linea.insumo_id_publico for linea in cambios.lineas}
+    activos = {
+        insumo.id_publico
+        for insumo in db.query(models.Insumo)
+        .filter(models.Insumo.id_publico.in_(pedidos_ids), models.Insumo.activo == 1)
+        .all()
+    }
+    for linea in cambios.lineas:
+        if linea.insumo_id_publico not in activos:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"El insumo '{linea.insumo_id_publico}' no existe o no esta activo en el catalogo.",
+            )
+
+    try:
+        db.query(models.DetallePedido).filter(
+            models.DetallePedido.pedido_id_publico == id_publico
+        ).delete(synchronize_session=False)
+
+        for linea in cambios.lineas:
+            db.add(
+                models.DetallePedido(
+                    id_publico=str(uuid.uuid4()),
+                    pedido_id_publico=id_publico,
+                    insumo_id_publico=linea.insumo_id_publico,
+                    cantidad=linea.cantidad,
+                )
+            )
+
+        if cambios.motivo is not None:
+            pedido.motivo = cambios.motivo
+        pedido.fecha_estado = datetime.now()
+
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return (
+        db.query(models.Pedido)
+        .options(joinedload(models.Pedido.lineas).joinedload(models.DetallePedido.insumo))
+        .filter(models.Pedido.id_publico == id_publico)
+        .first()
+    )
+
+
 @app.get("/pedidos", response_model=List[schemas.PedidoOut], tags=["Pedidos"])
 def consultar_pedidos(solicitante: str, db: Session = Depends(get_db)):
     """

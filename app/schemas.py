@@ -28,6 +28,13 @@ class PedidoCreate(BaseModel):
     motivo: Optional[str] = Field(None, max_length=500, description="Motivo o comentario de la solicitud")
 
 
+class PedidoEditar(BaseModel):
+    """Reemplaza por completo las lineas de un pedido que aun no se aprobo."""
+
+    lineas: List[DetallePedidoCreate] = Field(..., min_length=1, description="Lineas que quedan en el pedido")
+    motivo: Optional[str] = Field(None, max_length=500, description="Motivo o comentario de la solicitud")
+
+
 class DetallePedidoOut(BaseModel):
     id_publico: str
     insumo_id_publico: str

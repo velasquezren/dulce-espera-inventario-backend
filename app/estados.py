@@ -62,6 +62,16 @@ def se_puede_cancelar(estado: Optional[str]) -> bool:
     return CANCELADO in TRANSICIONES.get(normalizar(estado) or "", frozenset())
 
 
+#: Mientras nadie decidio nada todavia, cocina puede corregir lo que pidio.
+#: Desde Aceptado ya no: compras aprobo esa lista concreta y cambiarla por
+#: debajo haria que salgan a comprar algo distinto de lo que autorizaron.
+EDITABLES: FrozenSet[str] = frozenset({PENDIENTE, EN_REVISION})
+
+
+def se_puede_editar(estado: Optional[str]) -> bool:
+    return (normalizar(estado) or "") in EDITABLES
+
+
 def motivo_de_rechazo(actual: Optional[str], siguiente: str) -> Optional[str]:
     """
     Explica por que no se admite el cambio, o None si es valido.
