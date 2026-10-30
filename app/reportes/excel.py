@@ -34,13 +34,13 @@ COLUMNAS = [
     (22, "Categoría", "left"),
     (11, "Cantidad", "right"),
     (14, "Unidad", "left"),
-    (11, "Recibido", "center"),
-    (13, "Cant. real", "center"),
-    (30, "Observaciones", "left"),
 ]
 
 TOTAL_COLUMNAS = len(COLUMNAS)
 ULTIMA = get_column_letter(TOTAL_COLUMNAS)
+
+#: Donde arranca cada linea de firma: una a la izquierda y otra a la derecha.
+COLUMNAS_FIRMA = (1, TOTAL_COLUMNAS - 1)
 
 _lado = Side(border_style="thin", color=GRIS_LINEA)
 BORDE = Border(left=_lado, right=_lado, top=_lado, bottom=_lado)
@@ -72,16 +72,16 @@ def _encabezado(ws: Worksheet, documento: Documento, seccion: Seccion) -> int:
     ws.merge_cells(f"A3:{ULTIMA}3")
     _texto(ws, "A3", seccion.canal["detalle"], tam=9, color=GRIS_TEXTO)
 
-    # Los datos del pedido en dos columnas de etiqueta/valor.
+    # Dos datos por renglon: un par de etiqueta/valor a cada lado de la hoja.
     fila = 5
     for indice, (etiqueta, valor) in enumerate(documento.meta):
-        columna = 1 if indice % 2 == 0 else 4
+        etiqueta_en = 1 if indice % 2 == 0 else 3
         f = fila + indice // 2
-        _texto(ws, f"{get_column_letter(columna)}{f}", f"{etiqueta}:", tam=9,
+        _texto(ws, f"{get_column_letter(etiqueta_en)}{f}", f"{etiqueta}:", tam=9,
                negrita=True, color=GRIS_TEXTO)
-        ws.merge_cells(start_row=f, start_column=columna + 1, end_row=f,
-                       end_column=columna + 2 if columna == 1 else TOTAL_COLUMNAS)
-        _texto(ws, f"{get_column_letter(columna + 1)}{f}", valor, tam=10)
+        # Sin combinar: si el nombre es largo se derrama sobre la celda vacia
+        # de al lado en vez de quedar cortado.
+        _texto(ws, f"{get_column_letter(etiqueta_en + 1)}{f}", valor, tam=10)
 
     fila += (len(documento.meta) + 1) // 2
 
@@ -115,9 +115,6 @@ def _tabla(ws: Worksheet, seccion: Seccion, fila: int) -> int:
                 grupo.nombre,
                 articulo.cantidad,
                 articulo.presentacion,
-                None,  # casilla para marcar al recibir
-                None,  # cantidad que llego de verdad
-                None,  # observaciones
             ]
             for indice, valor in enumerate(valores, start=1):
                 letra = get_column_letter(indice)
@@ -141,8 +138,6 @@ def _tabla(ws: Worksheet, seccion: Seccion, fila: int) -> int:
                    fondo=VERDE_SUAVE, alineacion="right")
     total.number_format = "#,##0"
     _texto(ws, f"E{fila}", "insumos", tam=9, color=GRIS_TEXTO, fondo=VERDE_SUAVE)
-    for indice in range(6, TOTAL_COLUMNAS + 1):
-        _texto(ws, f"{get_column_letter(indice)}{fila}", None, fondo=VERDE_SUAVE)
     ws.row_dimensions[fila].height = 20
 
     return cabecera, ultima_dato, fila + 2
@@ -151,13 +146,13 @@ def _tabla(ws: Worksheet, seccion: Seccion, fila: int) -> int:
 def _firmas(ws: Worksheet, documento: Documento, fila: int) -> None:
     fila += 1
     for indice, firma in enumerate(documento.firmas):
-        columna = 1 if indice == 0 else 5
+        columna = COLUMNAS_FIRMA[indice % len(COLUMNAS_FIRMA)]
         ws.merge_cells(start_row=fila, start_column=columna, end_row=fila,
-                       end_column=columna + 2)
-        _texto(ws, f"{get_column_letter(columna)}{fila}", "_" * 34, tam=10,
+                       end_column=columna + 1)
+        _texto(ws, f"{get_column_letter(columna)}{fila}", "_" * 28, tam=10,
                color=GRIS_TEXTO, alineacion="center")
         ws.merge_cells(start_row=fila + 1, start_column=columna, end_row=fila + 1,
-                       end_column=columna + 2)
+                       end_column=columna + 1)
         _texto(ws, f"{get_column_letter(columna)}{fila + 1}", firma, tam=9,
                negrita=True, color=GRIS_TEXTO, alineacion="center")
 
