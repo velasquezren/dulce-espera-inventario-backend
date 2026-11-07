@@ -7,11 +7,14 @@ Nunca borra ni vacia nada:
 - No elimina insumos: los pedidos antiguos apuntan a ellos.
 
 Sin argumentos muestra lo que haria. Con --aplicar lo hace.
+Los insumos que el archivo trae y la base no tiene solo se crean si ademas
+se pasa --crear, para que un id mal escrito no invente un insumo.
 """
 
 import json
 import os
 import sys
+import unicodedata
 from datetime import datetime
 
 import pymysql
@@ -21,6 +24,7 @@ RAIZ = "/opt/dulce_espera_backend"
 load_dotenv(f"{RAIZ}/.env")
 
 APLICAR = "--aplicar" in sys.argv
+CREAR = "--crear" in sys.argv
 CAMPOS = {
     "nombre": "nombre",
     "grupo": "grupo",
@@ -38,6 +42,37 @@ conexion = pymysql.connect(
     cursorclass=pymysql.cursors.DictCursor,
 )
 
+def sin_tildes(texto):
+    descompuesto = unicodedata.normalize("NFD", (texto or "").strip().lower())
+    return "".join(c for c in descompuesto if unicodedata.category(c) != "Mn")
+
+
+def canonizar_categorias(nuevos, actuales):
+    """
+    Respeta como esta escrita cada categoria en la base.
+
+    FileMaker a veces exporta "Dulceria" donde la base dice "Dulceria" con
+    tilde. Si se escribieran las dos, la hoja de compras partiria una misma
+    categoria en dos grupos. Una categoria que de verdad es nueva, o un
+    nombre mal escrito que el archivo viene a corregir, no coinciden al
+    quitar las tildes y pasan tal cual.
+    """
+    canonica = {}
+    for fila in actuales.values():
+        categoria = (fila.get("categoria") or "").strip()
+        if categoria:
+            canonica.setdefault(sin_tildes(categoria), categoria)
+
+    ajustadas = 0
+    for insumo in nuevos.values():
+        entrante = (insumo.get("categoria") or "").strip()
+        preferida = canonica.get(sin_tildes(entrante))
+        if entrante and preferida and preferida != entrante:
+            insumo["categoria"] = preferida
+            ajustadas += 1
+    return ajustadas
+
+
 archivo = json.load(open(f"{RAIZ}/insumos_actualizados.json", encoding="utf-8"))
 nuevos = {i["id_publico"]: i for i in archivo["insumos"]}
 
@@ -52,11 +87,16 @@ try:
         json.dump(list(actuales.values()), f, ensure_ascii=False, indent=1, default=str)
     print(f"Respaldo de {len(actuales)} insumos en {respaldo}\n")
 
-    cambios, desconocidos = [], []
+    ajustadas = canonizar_categorias(nuevos, actuales)
+    if ajustadas:
+        print(f"Categorias escritas como ya estaban en la base: {ajustadas}\n")
+
+    cambios, por_crear = [], []
     for id_publico, nuevo in nuevos.items():
         actual = actuales.get(id_publico)
         if actual is None:
-            desconocidos.append(id_publico)
+            if nuevo.get("nombre"):
+                por_crear.append(nuevo)
             continue
         diferencias = {}
         for origen, columna in CAMPOS.items():
@@ -69,10 +109,15 @@ try:
     print(f"Insumos en el archivo : {len(nuevos)}")
     print(f"Insumos en la base    : {len(actuales)}")
     print(f"Filas a modificar     : {len(cambios)}")
-    print(f"Ids del archivo que no existen en la base: {len(desconocidos)}")
-    if desconocidos:
-        print("  ", desconocidos[:10])
+    print(f"Insumos a crear       : {len(por_crear)}" + ("" if CREAR else "  (hacen falta --crear)"))
     print()
+
+    for nuevo in por_crear:
+        print(f"  NUEVO {nuevo['id_publico']:<8} {nuevo['nombre'][:30]:<32} "
+              f"{nuevo.get('grupo') or '-':<14} {nuevo.get('categoria') or '-':<20} "
+              f"{nuevo.get('presentacion') or '-'}")
+    if por_crear:
+        print()
 
     for id_publico, actual, diferencias in cambios:
         print(f"  {id_publico:<8} {str(actual['nombre'])[:26]:<28}")
@@ -90,8 +135,27 @@ try:
                 f"UPDATE insumos SET {asignaciones}, fecha_actualizacion = %s WHERE id_publico = %s",
                 [*diferencias.values(), datetime.now(), id_publico],
             )
+
+        creados = 0
+        if CREAR:
+            for nuevo in por_crear:
+                cur.execute(
+                    "INSERT INTO insumos (id_publico, nombre, categoria, grupo, presentacion,"
+                    " activo, fecha_actualizacion) VALUES (%s, %s, %s, %s, %s, 1, %s)",
+                    [
+                        nuevo["id_publico"],
+                        nuevo["nombre"],
+                        nuevo.get("categoria") or None,
+                        nuevo.get("grupo") or None,
+                        nuevo.get("presentacion") or None,
+                        datetime.now(),
+                    ],
+                )
+                creados += 1
+
     conexion.commit()
-    print(f"\nListo: {len(cambios)} insumos actualizados.")
+    print(f"\nListo: {len(cambios)} insumos actualizados" +
+          (f" y {creados} creados." if CREAR else "."))
 
 except Exception as error:
     conexion.rollback()
